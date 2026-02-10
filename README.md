@@ -140,6 +140,27 @@ To make this analysis publication-ready, the following enhancements are recommen
 4. **Workflow Automation**: Snakemake or Nextflow pipeline for full reproducibility
 5. **Interactive Visualization**: Shiny app for exploring results across comparisons
 
+### Performance Metrics (Post-Refactoring)
+
+Once mixed-effects models are implemented, the following validation metrics will be calculated:
+
+**Intra-Class Correlation (ICC):**
+- Quantifies proportion of variance explained by mouse-level vs treatment-level effects
+- Formula: `ICC = σ²_between / (σ²_between + σ²_within)`
+- Expected: ICC > 0.3 would indicate significant within-mouse correlation, validating the need for mixed models
+- **Status**: Requires variancePartition implementation
+
+**Model Comparison:**
+- Compare number of significant genes: standard limma vs dream
+- Expected: dream will be more conservative (fewer false positives)
+- Report fold-change correlation between methods
+- **Status**: Requires parallel analysis runs
+
+**Biological Validation:**
+- Pathway enrichment consistency between statistical approaches
+- Expected: Core pathways should remain significant in both methods
+- **Status**: Requires mixed-effects re-analysis
+
 ### Contact
 - **Author**: Sean Quinlan
 - **Platform**: NanoString GeoMx Digital Spatial Profiler
