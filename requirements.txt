@@ -1,0 +1,39 @@
+# R Package Requirements for GeoMx Analysis
+# Install these packages in R:
+
+# Core GeoMx packages (Bioconductor)
+# - GeomxTools
+# - NanoStringNCTools
+# - org.Mm.eg.db
+
+# Statistical analysis (CRAN)
+# - limma
+
+# Data manipulation (CRAN)
+# - dplyr
+# - tidyr
+# - tibble
+
+# Visualization (CRAN)
+# - ggplot2
+# - ggrepel
+# - pheatmap
+# - RColorBrewer
+# - patchwork
+
+# Pathway analysis (Bioconductor)
+# - clusterProfiler
+# - enrichplot
+# - DOSE
+
+# Installation commands:
+# install.packages(c("dplyr", "tidyr", "tibble", "ggplot2", "ggrepel", 
+#                    "pheatmap", "RColorBrewer", "patchwork", "here"))
+#
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# BiocManager::install(c("GeomxTools", "NanoStringNCTools", "limma", 
+#                        "clusterProfiler", "org.Mm.eg.db", "enrichplot", "DOSE"))
+
+# R Version: >= 4.4.0
+# Bioconductor Version: >= 3.19

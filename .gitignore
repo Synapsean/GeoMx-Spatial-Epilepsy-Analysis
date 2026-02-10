@@ -1,0 +1,22 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Data files (unpublished research)
+*.xlsm
+*.xlsx
+*.xls
+*.rds
+*.csv
+DCC_Files/
+target_geoData_*
+*.pkc
+
+# Large output directories
+archive/
+renv/library/
+
+# Temporary files
+*tmp*
+*.tmp
