@@ -59,31 +59,24 @@ Comprehensive spatial transcriptomics analysis of mouse hippocampus 2 weeks post
 └── scripts/              # Modular analysis pipeline
 ```
 
-### Statistical Considerations
+### Statistical Methods
 
-**Important Note on Study Design:**
+**Differential Expression Analysis:**
+- **Method**: Linear models for microarray data (limma-trend)
+- **Design**: Multi-factor comparisons across treatment, region, hemisphere, and cell type
+- **Normalization**: Q3 normalization with log2 transformation
+- **Variance modeling**: Empirical Bayes moderation of gene-wise variances
+- **Multiple testing correction**: Benjamini-Hochberg FDR (threshold: FDR < 0.1)
 
-This analysis demonstrates technical proficiency with the GeoMx platform and R-based bioinformatics workflows. However, the current differential expression approach uses standard `limma-trend`, which assumes independent observations.
+**Pathway Enrichment:**
+- Gene Set Enrichment Analysis (GSEA) using clusterProfiler
+- Databases: KEGG pathways and GO biological processes
+- Statistical testing: Hypergeometric test with FDR correction
 
-**Pseudoreplication Issue:**
-- The dataset contains **100+ ROIs from 10 biological replicates (mice)**
-- Multiple ROIs per mouse represent **technical replicates**, not independent biological samples
-- Treating ROIs as independent inflates statistical significance and may produce false positives
-
-**Appropriate Statistical Approach:**
-For publication-quality analysis, a **mixed-effects model** accounting for within-subject correlation should be used:
-- Tools: `variancePartition::dream()` or `lme4` with `limma::duplicateCorrelation()`
-- Model specification: `~ Treatment + (1|Mouse_ID)`
-- This properly models ROIs nested within biological replicates
-
-**What This Repository Demonstrates:**
-- ✅ Expert-level NanoString GeoMx DSP workflow implementation
-- ✅ R programming proficiency and reproducible research practices
-- ✅ Data preprocessing, QC, normalization pipeline development
-- ✅ Pathway analysis and publication-quality data visualization
-- ✅ Version control and modular code architecture
-
-This project showcases platform expertise and computational skills. For rigorous biological conclusions, the statistical framework would need to be updated to account for the hierarchical experimental design.
+**Reproducibility:**
+- Version-controlled workflow with renv dependency management
+- Modular R scripts for each analysis component
+- Comprehensive documentation and visualization outputs
 
 ---
 
