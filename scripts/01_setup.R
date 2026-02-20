@@ -15,8 +15,8 @@ dir.create(RESULTS_DIR, showWarnings = FALSE)
 dir.create(FIGURES_DIR, showWarnings = FALSE)
 
 # --- Analysis Parameters ---
-FDR_THRESHOLD <- 0.10      # 10% FDR for exploratory analysis
-LFC_THRESHOLD <- 0.5       # Log2 fold change threshold for highlighting
+FDR_THRESHOLD <- 0.05      # 5% FDR (publication threshold)
+LFC_THRESHOLD <- 1.0       # Log2 fold change > 1 (2-fold change, publication threshold)
 P_THRESHOLD <- 0.05        # Nominal p-value threshold
 
 # --- Load Packages ---
@@ -31,6 +31,7 @@ library(NanoStringNCTools)
 
 # DE analysis
 library(limma)
+library(variancePartition)  # For mixed-effects models with dream()
 
 # Data manipulation
 library(dplyr)
@@ -43,12 +44,6 @@ library(ggrepel)
 library(pheatmap)
 library(RColorBrewer)
 library(patchwork)  # For combining plots
-
-# Pathway analysis
-library(clusterProfiler)
-library(org.Mm.eg.db)
-library(enrichplot)
-library(DOSE)
 
 message("All packages loaded successfully!")
 

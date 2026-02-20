@@ -9,6 +9,119 @@ Comprehensive spatial transcriptomics analysis of mouse hippocampus 2 weeks post
 - **Model**: Chronic temporal lobe epilepsy (2 weeks post-KA)
 - **Tissue**: Mouse hippocampus (CA1, CA3 regions)
 - **Cell types**: Astrocytes, Microglia, Neurons (morphology-guided segmentation)
+- **Comparisons**: Treatment (KA vs PBS) × Region (CA1 vs CA3) × Hemisphere (Ipsi vs Contra) × Cell type (3) = 60 total comparisons
+- **Platform**: NanoString GeoMx DSP with Mouse Whole Transcriptome Atlas
+- **Sample size**: 10 mice (5 KA, 5 PBS), ~100+ ROIs across conditions
+
+### Analysis Pipeline
+
+#### 1. Data Preprocessing (`scripts/00_preprocessing.R`)
+- Quality control and filtering
+- Normalization (Q3, quantile, background subtraction)
+- Limit of quantification (LOQ) filtering
+
+#### 2. Modular Analysis Scripts (`scripts/`)
+```
+01_setup.R                    # Configuration and package loading
+02_differential_expression.R  # 60 DE comparisons (dream + limma-trend fallback)
+03_pathway_analysis.R         # KEGG/GO enrichment analysis
+04_figures.R                  # Publication-quality visualizations
+05_run_all.R                  # Master pipeline script
+```
+
+#### 3. Statistical Approach
+- **Primary method**: `variancePartition::dream()` — linear mixed-effects models with `(1|Mouse)` random effect to account for within-mouse correlation across ROIs
+- **Fallback**: limma-trend when insufficient replication for random effects (< 2 ROIs/mouse)
+- **Multiple testing**: Benjamini-Hochberg FDR correction
+- **Thresholds**: FDR < 0.05, |logFC| > 1.0
+- **Pathway analysis**: clusterProfiler GSEA with KEGG/GO databases
+
+#### 4. Interactive Dashboard (`shiny_app/app.R`)
+Shiny dashboard for exploring results across all 60 comparisons:
+- **Overview tab**: Summary heatmap, DE gene counts per comparison
+- **Comparison Explorer**: Volcano plots and MA plots for any comparison
+- **Gene Search**: Track any gene across all 60 comparisons
+- **Cross-Comparison**: Side-by-side heatmaps across cell types/regions
+
+```r
+# Launch dashboard
+source("launch_dashboard.R")
+```
+
+### Output Structure
+```
+├── results/
+│   ├── de_results_all.rds        # All 60 comparisons (primary output)
+│   ├── checkpoint_1_treatment.rds
+│   ├── checkpoint_2_regional.rds
+│   └── checkpoint_3_side.rds
+├── figures/                       # Publication-ready plots (PDF + PNG)
+└── scripts/                       # Modular analysis pipeline
+```
+
+### Statistical Methods
+
+**Differential Expression:**
+- Mixed-effects model: `dream(~ condition + (1|Mouse))` via variancePartition
+- Automatic fallback to limma-trend when random effects cannot be estimated
+- Empirical Bayes variance moderation
+- BH FDR correction (threshold: FDR < 0.05, |logFC| > 1.0)
+
+**Pathway Enrichment:**
+- Gene Set Enrichment Analysis (GSEA) using clusterProfiler
+- Databases: KEGG pathways and GO biological processes
+- Statistical testing: Hypergeometric test with FDR correction
+
+### Dependencies
+```r
+# Core GeoMx
+GeomxTools, NanoStringNCTools
+
+# Statistical analysis
+limma, variancePartition, BiocParallel, edgeR
+
+# Pathway analysis
+clusterProfiler, org.Mm.eg.db, enrichplot, DOSE
+
+# Data manipulation
+dplyr, tidyr, tibble, here
+
+# Visualization
+ggplot2, ggrepel, pheatmap, RColorBrewer, patchwork
+```
+
+### Reproducibility
+- renv for R package version management
+- Checkpoint saves after each analysis section
+- OS-aware parallelisation (SerialParam on Windows, MulticoreParam on Linux/HPC)
+- Tested on UCD Sonic HPC (SLURM, R/4.4.2, 16 cores)
+
+### Usage
+```bash
+# Run complete pipeline
+Rscript scripts/05_run_all.R
+
+# Individual steps
+Rscript scripts/02_differential_expression.R
+Rscript scripts/03_pathway_analysis.R
+
+# HPC (SLURM)
+sbatch hpc_job.sh
+```
+
+### Contact
+- **Author**: Sean Quinlan
+- **Platform**: NanoString GeoMx Digital Spatial Profiler
+- **Analysis Date**: February 2026
+
+---
+*Spatial transcriptomics pipeline implementing mixed-effects models for nested experimental designs, with interactive visualisation and HPC-compatible parallelisation.*
+
+
+### Experimental Design
+- **Model**: Chronic temporal lobe epilepsy (2 weeks post-KA)
+- **Tissue**: Mouse hippocampus (CA1, CA3 regions)
+- **Cell types**: Astrocytes, Microglia, Neurons (morphology-guided segmentation)
 - **Comparisons**: Treatment (KA vs PBS) × Region (CA1 vs CA3) × Hemisphere (Ipsi vs Contra)
 - **Platform**: NanoString GeoMx DSP with Mouse Whole Transcriptome Atlas
 - **Sample size**: 48 ROIs across conditions

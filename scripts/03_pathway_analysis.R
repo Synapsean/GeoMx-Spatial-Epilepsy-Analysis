@@ -10,6 +10,12 @@
 
 source("scripts/01_setup.R")
 
+# Pathway analysis packages (not needed for DE, loaded here only)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(enrichplot)
+library(DOSE)
+
 # Load DE results
 de_results <- readRDS(file.path(RESULTS_DIR, "de_results_all.rds"))
 
