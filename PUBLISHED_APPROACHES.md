@@ -169,5 +169,3 @@ overlap <- intersect(top_genes_roi, top_genes_patient)
 4. Hoffman GE & Schadt EE (2016). "variancePartition: interpreting drivers of variation in complex gene expression studies." *BMC Bioinformatics* 17:483.
 
 ---
-
-**Summary:** Start with duplicateCorrelation (2-3 hours), validate at mouse level (3 hours), optionally add variancePartition later (1 day). This addresses the statistical flaw transparently while being time-efficient.
