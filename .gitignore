@@ -15,7 +15,12 @@ target_geoData_*
 
 # Large output directories
 archive/
+results/
 renv/library/
+figures/
+
+# Interview prep (private)
+INTERVIEW_PREP_METAFLUX.md
 
 # Temporary files
 *tmp*

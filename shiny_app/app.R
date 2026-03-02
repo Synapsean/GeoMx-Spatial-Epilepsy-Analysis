@@ -76,7 +76,7 @@ parse_comparison <- function(name) {
 comparison_meta <- do.call(rbind, lapply(names(de_results), parse_comparison))
 
 # Build summary stats
-comparison_meta$n_fdr_sig <- sapply(de_results, function(x) sum(x$adj.P.Val < 0.10))
+comparison_meta$n_fdr_sig <- sapply(de_results, function(x) sum(x$adj.P.Val < 0.05))
 comparison_meta$n_nominal_sig <- sapply(de_results, function(x) sum(x$P.Value < 0.05))
 comparison_meta$top_gene <- sapply(de_results, function(x) rownames(x)[1])
 comparison_meta$top_logFC <- sapply(de_results, function(x) round(x$logFC[1], 2))
@@ -131,6 +131,25 @@ readable_label <- function(name) {
 comparison_meta$label <- sapply(comparison_meta$name, readable_label)
 
 # =============================================================================
+# Custom value box (simple version without shinydashboard)
+# =============================================================================
+valueBoxUI <- function(id) {
+  uiOutput(NS(id, "box"))
+}
+
+valueBoxServer <- function(id, value, subtitle, color = "#3c8dbc") {
+  moduleServer(id, function(input, output, session) {
+    output$box <- renderUI({
+      div(style = paste0("background:", color, 
+                         "; color:white; padding:15px; border-radius:5px; text-align:center; margin:10px 0;"),
+        h2(value, style = "margin:0;"),
+        p(subtitle, style = "margin:0; font-size:14px;")
+      )
+    })
+  })
+}
+
+# =============================================================================
 # UI
 # =============================================================================
 ui <- navbarPage(
@@ -153,7 +172,7 @@ ui <- navbarPage(
     ),
     fluidRow(
       column(12,
-        h4("Significant Genes per Comparison (FDR < 0.10)"),
+        h4("Significant Genes per Comparison (FDR < 0.05)"),
         plotlyOutput("overview_barplot", height = "600px")
       )
     ),
@@ -188,7 +207,7 @@ ui <- navbarPage(
                     choices = NULL),
         hr(),
         sliderInput("fdr_threshold", "FDR Threshold:",
-                    min = 0.01, max = 0.25, value = 0.10, step = 0.01),
+                    min = 0.01, max = 0.25, value = 0.05, step = 0.01),
         sliderInput("lfc_threshold", "Log2FC Threshold:",
                     min = 0, max = 3, value = 0.5, step = 0.1),
         hr(),
@@ -311,25 +330,6 @@ ui <- navbarPage(
 )
 
 # =============================================================================
-# Custom value box (simple version without shinydashboard)
-# =============================================================================
-valueBoxUI <- function(id) {
-  uiOutput(NS(id, "box"))
-}
-
-valueBoxServer <- function(id, value, subtitle, color = "#3c8dbc") {
-  moduleServer(id, function(input, output, session) {
-    output$box <- renderUI({
-      div(style = paste0("background:", color, 
-                         "; color:white; padding:15px; border-radius:5px; text-align:center; margin:10px 0;"),
-        h2(value, style = "margin:0;"),
-        p(subtitle, style = "margin:0; font-size:14px;")
-      )
-    })
-  })
-}
-
-# =============================================================================
 # SERVER
 # =============================================================================
 server <- function(input, output, session) {
@@ -343,7 +343,7 @@ server <- function(input, output, session) {
                  "Genes Tested", "#00a65a")
   valueBoxServer("n_with_hits",
                  sum(comparison_meta$n_fdr_sig > 0),
-                 "Comparisons with FDR < 0.10 Hits", "#f39c12")
+                 "Comparisons with FDR < 0.05 Hits", "#f39c12")
   
   # --- Overview Bar Plot ---
   output$overview_barplot <- renderPlotly({
@@ -351,20 +351,23 @@ server <- function(input, output, session) {
       arrange(contrast, desc(n_fdr_sig)) %>%
       mutate(label = factor(label, levels = rev(label)))
     
-    colors <- c("KA vs PBS" = "#e74c3c", "CA3 vs CA1" = "#3498db", 
-                "Ipsi vs Contra" = "#2ecc71", "Region x Treatment" = "#9b59b6")
+    color_map <- c("KA vs PBS" = "#e74c3c", "CA3 vs CA1" = "#3498db",
+                   "Ipsi vs Contra" = "#2ecc71", "Region x Treatment" = "#9b59b6")
+    bar_colors <- color_map[df$contrast]
     
-    p <- ggplot(df, aes(x = n_fdr_sig, y = label, fill = contrast,
-                        text = paste0(label, "\nFDR sig: ", n_fdr_sig, 
-                                     "\nNominal sig: ", n_nominal_sig,
-                                     "\nTop gene: ", top_gene))) +
-      geom_col() +
-      scale_fill_manual(values = colors) +
-      labs(x = "Number of Significant Genes (FDR < 0.10)", y = "", fill = "Contrast") +
-      theme_minimal() +
-      theme(axis.text.y = element_text(size = 8))
-    
-    ggplotly(p, tooltip = "text") %>% layout(height = 600)
+    plot_ly(df, x = ~n_fdr_sig, y = ~label, type = "bar", orientation = "h",
+            marker = list(color = bar_colors),
+            text = ~paste0(label, "<br>FDR sig: ", n_fdr_sig,
+                           "<br>Nominal sig: ", n_nominal_sig,
+                           "<br>Top gene: ", top_gene),
+            hoverinfo = "text") %>%
+      layout(
+        xaxis = list(title = "Number of Significant Genes (FDR < 0.05)"),
+        yaxis = list(title = "", tickfont = list(size = 9)),
+        height = 600,
+        showlegend = FALSE,
+        margin = list(l = 250)
+      )
   })
   
   # --- Overview Table ---
@@ -418,44 +421,56 @@ server <- function(input, output, session) {
   output$volcano_plot <- renderPlotly({
     de <- current_de()
     
-    de$neg_log10_fdr <- -log10(de$adj.P.Val)
-    de$neg_log10_fdr[is.infinite(de$neg_log10_fdr)] <- max(de$neg_log10_fdr[is.finite(de$neg_log10_fdr)]) + 1
+    de$neg_log10_p <- -log10(de$P.Value)
+    de$neg_log10_p[is.infinite(de$neg_log10_p)] <- max(de$neg_log10_p[is.finite(de$neg_log10_p)]) + 1
     
-    colors <- c("Significant" = "#e74c3c", "Not Significant" = "#bdc3c7")
+    colors <- ifelse(de$Significant == "Significant", "#e74c3c", "#bdc3c7")
     
-    p <- ggplot(de, aes(x = logFC, y = neg_log10_fdr, color = Significant,
-                        text = paste0("Gene: ", Gene, 
-                                     "\nlogFC: ", round(logFC, 3),
-                                     "\nFDR: ", signif(adj.P.Val, 3)))) +
-      geom_point(alpha = 0.6, size = 1.5) +
-      scale_color_manual(values = colors) +
-      geom_vline(xintercept = c(-input$lfc_threshold, input$lfc_threshold), 
-                 linetype = "dashed", alpha = 0.5) +
-      geom_hline(yintercept = -log10(input$fdr_threshold), 
-                 linetype = "dashed", alpha = 0.5) +
-      labs(x = "Log2 Fold Change", y = "-Log10(FDR)") +
-      theme_minimal()
-    
-    ggplotly(p, tooltip = "text")
+    plot_ly(de, x = ~logFC, y = ~neg_log10_p,
+            type = "scatter", mode = "markers",
+            marker = list(color = colors, size = 5, opacity = 0.6),
+            text = ~paste0("Gene: ", Gene,
+                           "<br>logFC: ", round(logFC, 3),
+                           "<br>P.Value: ", signif(P.Value, 3),
+                           "<br>FDR: ", signif(adj.P.Val, 3)),
+            hoverinfo = "text") %>%
+      layout(
+        xaxis = list(title = "Log2 Fold Change",
+                     zeroline = TRUE,
+                     zerolinecolor = "#aaaaaa"),
+        yaxis = list(title = "-Log10(P-value)"),
+        shapes = list(
+          list(type="line", x0=input$lfc_threshold,  x1=input$lfc_threshold,
+               y0=0, y1=1, yref="paper", line=list(dash="dash", color="#555", width=1)),
+          list(type="line", x0=-input$lfc_threshold, x1=-input$lfc_threshold,
+               y0=0, y1=1, yref="paper", line=list(dash="dash", color="#555", width=1)),
+          list(type="line", x0=0, x1=1, xref="paper",
+               y0=-log10(input$fdr_threshold), y1=-log10(input$fdr_threshold),
+               line=list(dash="dash", color="#555", width=1))
+        ),
+        showlegend = FALSE
+      )
   })
   
   # --- MA Plot ---
   output$ma_plot <- renderPlotly({
     de <- current_de()
     
-    colors <- c("Significant" = "#e74c3c", "Not Significant" = "#bdc3c7")
+    colors <- ifelse(de$Significant == "Significant", "#e74c3c", "#bdc3c7")
     
-    p <- ggplot(de, aes(x = AveExpr, y = logFC, color = Significant,
-                        text = paste0("Gene: ", Gene,
-                                     "\nAveExpr: ", round(AveExpr, 2),
-                                     "\nlogFC: ", round(logFC, 3)))) +
-      geom_point(alpha = 0.6, size = 1.5) +
-      scale_color_manual(values = colors) +
-      geom_hline(yintercept = 0, linetype = "dashed") +
-      labs(x = "Average Expression", y = "Log2 Fold Change") +
-      theme_minimal()
-    
-    ggplotly(p, tooltip = "text")
+    plot_ly(de, x = ~AveExpr, y = ~logFC,
+            type = "scatter", mode = "markers",
+            marker = list(color = colors, size = 5, opacity = 0.6),
+            text = ~paste0("Gene: ", Gene,
+                           "<br>AveExpr: ", round(AveExpr, 2),
+                           "<br>logFC: ", round(logFC, 3),
+                           "<br>FDR: ", signif(adj.P.Val, 3)),
+            hoverinfo = "text") %>%
+      layout(
+        xaxis = list(title = "Average Expression (log2)"),
+        yaxis = list(title = "Log2 Fold Change", zeroline = TRUE, zerolinecolor = "#aaaaaa"),
+        showlegend = FALSE
+      )
   })
   
   # --- DE Table ---
@@ -497,29 +512,27 @@ server <- function(input, output, session) {
     df <- gene_results()
     req(nrow(df) > 0)
     
-    # Add metadata
-    df <- merge(df, comparison_meta[, c("name", "contrast", "cell_type", "label")], 
+    df <- merge(df, comparison_meta[, c("name", "contrast", "cell_type", "label")],
                 by.x = "Comparison", by.y = "name")
-    df$sig <- ifelse(df$FDR < 0.10, "FDR < 0.10", "Not Significant")
+    df$sig <- ifelse(df$FDR < 0.05, "FDR < 0.05", "Not Significant")
     df <- df %>% arrange(contrast, logFC)
     df$label <- factor(df$label, levels = df$label)
     
-    colors <- c("Astrocyte" = "#e74c3c", "Microglia" = "#3498db", "Neuron" = "#2ecc71")
+    color_map <- c("Astrocyte" = "#e74c3c", "Microglia" = "#3498db", "Neuron" = "#2ecc71")
+    bar_colors <- color_map[df$cell_type]
+    bar_opacity <- ifelse(df$sig == "FDR < 0.05", 1, 0.3)
     
-    p <- ggplot(df, aes(x = logFC, y = label, fill = cell_type,
-                        alpha = sig,
-                        text = paste0(label, 
-                                     "\nlogFC: ", logFC,
-                                     "\nFDR: ", FDR))) +
-      geom_col() +
-      scale_fill_manual(values = colors) +
-      scale_alpha_manual(values = c("FDR < 0.10" = 1, "Not Significant" = 0.3)) +
-      geom_vline(xintercept = 0, linetype = "dashed") +
-      labs(x = "Log2 Fold Change", y = "", fill = "Cell Type", alpha = "Significance") +
-      theme_minimal() +
-      theme(axis.text.y = element_text(size = 7))
-    
-    ggplotly(p, tooltip = "text") %>% layout(height = 400)
+    plot_ly(df, x = ~logFC, y = ~label, type = "bar", orientation = "h",
+            marker = list(color = bar_colors, opacity = bar_opacity),
+            text = ~paste0(label, "<br>logFC: ", round(logFC, 3), "<br>FDR: ", signif(FDR, 3)),
+            hoverinfo = "text") %>%
+      layout(
+        xaxis = list(title = "Log2 Fold Change", zeroline = TRUE, zerolinecolor = "#aaa"),
+        yaxis = list(title = "", tickfont = list(size = 8)),
+        height = 400,
+        showlegend = FALSE,
+        margin = list(l = 250)
+      )
   })
   
   output$gene_table <- renderDT({
@@ -528,7 +541,7 @@ server <- function(input, output, session) {
     
     df <- merge(df, comparison_meta[, c("name", "label", "contrast", "cell_type")], 
                 by.x = "Comparison", by.y = "name")
-    df$Significant <- ifelse(df$FDR < 0.10, "Yes", "")
+    df$Significant <- ifelse(df$FDR < 0.05, "Yes", "")
     df <- df %>%
       select(Label = label, Contrast = contrast, `Cell Type` = cell_type,
              logFC, P.Value, FDR, AveExpr, Significant) %>%
@@ -571,7 +584,7 @@ server <- function(input, output, session) {
     if (ncol(mat) > 30) {
       # Keep only comparisons with significant results
       sig_comps <- df %>%
-        filter(FDR < 0.10) %>%
+        filter(FDR < 0.05) %>%
         pull(Comparison) %>%
         unique()
       if (length(sig_comps) > 0) {
@@ -604,7 +617,7 @@ server <- function(input, output, session) {
     
     df <- merge(df, comparison_meta[, c("name", "label", "contrast")],
                 by.x = "Comparison", by.y = "name")
-    df$Significant <- ifelse(df$FDR < 0.10, "Yes", "")
+    df$Significant <- ifelse(df$FDR < 0.05, "Yes", "")
     df <- df %>%
       select(Gene, Label = label, Contrast = contrast, logFC, P.Value, FDR, Significant) %>%
       arrange(Gene, P.Value)
@@ -650,7 +663,7 @@ server <- function(input, output, session) {
     sig_genes <- lapply(split(df, df$cell_type), function(ct_df) {
       genes <- lapply(ct_df$name, function(comp) {
         de <- de_results[[comp]]
-        rownames(de)[de$adj.P.Val < 0.10]
+        rownames(de)[de$adj.P.Val < 0.05]
       })
       unique(unlist(genes))
     })
@@ -666,7 +679,7 @@ server <- function(input, output, session) {
     p <- ggplot(overlap_df, aes(x = CellType, y = Count, fill = CellType)) +
       geom_col() +
       scale_fill_manual(values = colors) +
-      labs(x = "", y = "Number of Significant Genes (FDR < 0.10)",
+      labs(x = "", y = "Number of Significant Genes (FDR < 0.05)",
            title = paste("Significant Genes by Cell Type:", input$cross_contrast)) +
       theme_minimal() +
       theme(text = element_text(size = 14))

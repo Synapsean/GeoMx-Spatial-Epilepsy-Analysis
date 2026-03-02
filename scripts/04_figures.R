@@ -7,6 +7,11 @@
 
 source("scripts/01_setup.R")
 
+# Pathway/enrichment plot packages
+library(enrichplot)
+library(clusterProfiler)
+library(DOSE)
+
 # Load results
 de_results <- readRDS(file.path(RESULTS_DIR, "de_results_all.rds"))
 pathway_results <- readRDS(file.path(RESULTS_DIR, "pathway_results.rds"))
@@ -182,11 +187,12 @@ summary_df$CellType <- gsub("Micro", "Microglia", summary_df$CellType)
 fig3 <- summary_df %>%
   pivot_longer(cols = c(FDR_sig, Nominal_sig), 
                names_to = "Threshold", values_to = "n_genes") %>%
-  mutate(Threshold = ifelse(Threshold == "FDR_sig", "FDR < 0.1", "p < 0.05")) %>%
+  mutate(Threshold = ifelse(Threshold == "FDR_sig", paste0("FDR < ", FDR_THRESHOLD), "p < 0.05")) %>%
   ggplot(aes(x = reorder(Comparison, n_genes), y = n_genes, fill = Threshold)) +
   geom_col(position = "dodge", width = 0.7) +
   coord_flip() +
-  scale_fill_manual(values = c("FDR < 0.1" = "#2171B5", "p < 0.05" = "#FC9272")) +
+  scale_fill_manual(values = setNames(c("#2171B5", "#FC9272"),
+                                      c(paste0("FDR < ", FDR_THRESHOLD), "p < 0.05"))) +
   labs(title = "Differential Expression Results Summary",
        x = "", y = "Number of DE Genes") +
   theme_pub +
@@ -199,35 +205,35 @@ save_figure(fig3, "Fig3_DE_summary", width = 10, height = 8)
 # =============================================================================
 message("\n\n========== Figure 4: Volcano Plots ==========")
 
-# KA Regional Neuron (strongest result)
+# Reg_KA_Neuron: regional vulnerability in neurons (pooled sides, strongest result)
 fig4a <- plot_volcano_pub(
-  de_results$KA_Regional_Neuron,
+  de_results$Reg_KA_Neuron,
   title = "Neurons: CA3 vs CA1 (KA animals)",
-  subtitle = paste("FDR < 0.1:", sum(de_results$KA_Regional_Neuron$adj.P.Val < 0.1), "genes")
+  subtitle = paste0("FDR < ", FDR_THRESHOLD, ": ", sum(de_results$Reg_KA_Neuron$adj.P.Val < FDR_THRESHOLD), " genes")
 )
 save_figure(fig4a, "Fig4a_volcano_KA_neuron_regional", width = 10, height = 8)
 
-# KA Regional Microglia
+# Reg_KA_Micro
 fig4b <- plot_volcano_pub(
-  de_results$KA_Regional_Micro,
+  de_results$Reg_KA_Micro,
   title = "Microglia: CA3 vs CA1 (KA animals)",
-  subtitle = paste("FDR < 0.1:", sum(de_results$KA_Regional_Micro$adj.P.Val < 0.1), "genes")
+  subtitle = paste0("FDR < ", FDR_THRESHOLD, ": ", sum(de_results$Reg_KA_Micro$adj.P.Val < FDR_THRESHOLD), " genes")
 )
 save_figure(fig4b, "Fig4b_volcano_KA_micro_regional", width = 10, height = 8)
 
-# KA Regional Astrocyte
+# Reg_KA_Astro
 fig4c <- plot_volcano_pub(
-  de_results$KA_Regional_Astro,
+  de_results$Reg_KA_Astro,
   title = "Astrocytes: CA3 vs CA1 (KA animals)",
-  subtitle = paste("FDR < 0.1:", sum(de_results$KA_Regional_Astro$adj.P.Val < 0.1), "genes")
+  subtitle = paste0("FDR < ", FDR_THRESHOLD, ": ", sum(de_results$Reg_KA_Astro$adj.P.Val < FDR_THRESHOLD), " genes")
 )
 save_figure(fig4c, "Fig4c_volcano_KA_astro_regional", width = 10, height = 8)
 
-# Interaction Neuron
+# Int_Ipsi_Neuron: interaction effect (ipsilateral)
 fig4d <- plot_volcano_pub(
-  de_results$Interaction_Neuron,
-  title = "Neurons: Region × Treatment Interaction",
-  subtitle = "Genes with differential regional response to KA"
+  de_results$Int_Ipsi_Neuron,
+  title = "Neurons: Region × Treatment Interaction (Ipsi)",
+  subtitle = "Genes with injury-dependent regional difference"
 )
 save_figure(fig4d, "Fig4d_volcano_interaction_neuron", width = 10, height = 8)
 
@@ -236,8 +242,8 @@ save_figure(fig4d, "Fig4d_volcano_interaction_neuron", width = 10, height = 8)
 # =============================================================================
 message("\n\n========== Figure 5: Heatmaps ==========")
 
-# Top genes from neuronal regional comparison
-top_genes <- head(rownames(de_results$KA_Regional_Neuron), 50)
+# Top genes from neuronal regional comparison (CA3 vs CA1, pooled sides)
+top_genes <- head(rownames(de_results$Reg_KA_Neuron[order(de_results$Reg_KA_Neuron$adj.P.Val), ]), 50)
 
 mat_heatmap <- log2(assayDataElement(target_geoData, "q_norm")[top_genes, ] + 1)
 mat_z <- t(scale(t(mat_heatmap)))
@@ -268,7 +274,8 @@ pheatmap(mat_z_neuron,
          show_colnames = FALSE,
          clustering_method = "ward.D2",
          fontsize_row = 8,
-         main = "Top 50 DE Genes: Neurons CA3 vs CA1 (KA)")
+         main = paste0("Top 50 DE Genes: Neurons CA3 vs CA1 (KA) | FDR < ", FDR_THRESHOLD, ": ",
+                       sum(de_results$Reg_KA_Neuron$adj.P.Val < FDR_THRESHOLD), " genes"))
 dev.off()
 message("Saved: Fig5_heatmap_neuron_top50")
 
@@ -278,7 +285,7 @@ message("Saved: Fig5_heatmap_neuron_top50")
 message("\n\n========== Figure 6: Pathway Enrichment ==========")
 
 # GSEA dot plot for neuronal regional comparison
-gsea_result <- pathway_results$gsea_kegg$KA_Regional_Neuron
+gsea_result <- pathway_results$gsea_kegg$Reg_KA_Neuron
 
 if(!is.null(gsea_result) && nrow(gsea_result) > 0) {
   
@@ -301,7 +308,7 @@ if(!is.null(gsea_result) && nrow(gsea_result) > 0) {
 }
 
 # GO-BP dot plot
-go_result <- pathway_results$go_bp$KA_Regional_Neuron
+go_result <- pathway_results$go_bp$Reg_KA_Neuron
 
 if(!is.null(go_result) && nrow(go_result) > 0) {
   
@@ -334,9 +341,9 @@ compare_regional <- function(DE_KA, DE_PBS, cell_type) {
 }
 
 regional_compare <- rbind(
-  compare_regional(de_results$KA_Regional_Astro, de_results$PBS_Regional_Astro, "Astrocyte"),
-  compare_regional(de_results$KA_Regional_Micro, de_results$PBS_Regional_Micro, "Microglia"),
-  compare_regional(de_results$KA_Regional_Neuron, de_results$PBS_Regional_Neuron, "Neuron")
+  compare_regional(de_results$Reg_KA_Astro, de_results$Reg_PBS_Astro, "Astrocyte"),
+  compare_regional(de_results$Reg_KA_Micro, de_results$Reg_PBS_Micro, "Microglia"),
+  compare_regional(de_results$Reg_KA_Neuron, de_results$Reg_PBS_Neuron, "Neuron")
 )
 
 fig7 <- ggplot(regional_compare, aes(x = logFC_PBS, y = logFC_KA)) +
@@ -345,7 +352,7 @@ fig7 <- ggplot(regional_compare, aes(x = logFC_PBS, y = logFC_KA)) +
   geom_smooth(method = "lm", se = FALSE, color = "red", size = 0.5) +
   facet_wrap(~ CellType) +
   scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "#CB181D"),
-                     labels = c("NS", "FDR < 0.1 in KA")) +
+                     labels = c("NS", paste0("FDR < ", FDR_THRESHOLD, " in KA"))) +
   labs(title = "Regional Effect (CA3 vs CA1): KA vs PBS",
        subtitle = "Points above diagonal = enhanced regional difference in epilepsy",
        x = expression(log[2]~"FC (CA3/CA1) in PBS"),
@@ -361,50 +368,51 @@ save_figure(fig7, "Fig7_regional_KA_vs_PBS", width = 12, height = 5)
 message("\n\n========== Figure 8: CA3 KA vs PBS (Main Experiment) ==========")
 
 # Volcano plots for CA3 KA vs PBS (the main experimental question)
-if("CA3_KA_vs_PBS_Neuron" %in% names(de_results)) {
+# Using Ipsi side (most affected in KA model)
+if("Trt_CA3_Ipsi_Neuron" %in% names(de_results)) {
   fig8a <- plot_volcano_pub(
-    de_results$CA3_KA_vs_PBS_Neuron,
-    title = "CA3 Neurons: KA vs PBS",
-    subtitle = paste("Treatment effect in CA3 |",
-                     "FDR < 0.1:", sum(de_results$CA3_KA_vs_PBS_Neuron$adj.P.Val < 0.1), 
-                     "| p < 0.05:", sum(de_results$CA3_KA_vs_PBS_Neuron$P.Value < 0.05)),
-    n_label = 30  # More labels for this key figure
+    de_results$Trt_CA3_Ipsi_Neuron,
+    title = "CA3 Neurons (Ipsi): KA vs PBS",
+    subtitle = paste0("FDR < ", FDR_THRESHOLD, ": ",
+                      sum(de_results$Trt_CA3_Ipsi_Neuron$adj.P.Val < FDR_THRESHOLD),
+                      " | p < 0.05: ", sum(de_results$Trt_CA3_Ipsi_Neuron$P.Value < 0.05)),
+    n_label = 30
   )
-  save_figure(fig8a, "Fig8a_CA3_KA_vs_PBS_Neuron", width = 10, height = 8)
+  save_figure(fig8a, "Fig8a_CA3_Ipsi_KA_vs_PBS_Neuron", width = 10, height = 8)
 }
 
-if("CA3_KA_vs_PBS_Micro" %in% names(de_results)) {
+if("Trt_CA3_Ipsi_Micro" %in% names(de_results)) {
   fig8b <- plot_volcano_pub(
-    de_results$CA3_KA_vs_PBS_Micro,
-    title = "CA3 Microglia: KA vs PBS",
-    subtitle = paste("Treatment effect in CA3 |",
-                     "FDR < 0.1:", sum(de_results$CA3_KA_vs_PBS_Micro$adj.P.Val < 0.1),
-                     "| p < 0.05:", sum(de_results$CA3_KA_vs_PBS_Micro$P.Value < 0.05)),
+    de_results$Trt_CA3_Ipsi_Micro,
+    title = "CA3 Microglia (Ipsi): KA vs PBS",
+    subtitle = paste0("FDR < ", FDR_THRESHOLD, ": ",
+                      sum(de_results$Trt_CA3_Ipsi_Micro$adj.P.Val < FDR_THRESHOLD),
+                      " | p < 0.05: ", sum(de_results$Trt_CA3_Ipsi_Micro$P.Value < 0.05)),
     n_label = 30
   )
-  save_figure(fig8b, "Fig8b_CA3_KA_vs_PBS_Micro", width = 10, height = 8)
+  save_figure(fig8b, "Fig8b_CA3_Ipsi_KA_vs_PBS_Micro", width = 10, height = 8)
 }
 
-if("CA3_KA_vs_PBS_Astro" %in% names(de_results)) {
+if("Trt_CA3_Ipsi_Astro" %in% names(de_results)) {
   fig8c <- plot_volcano_pub(
-    de_results$CA3_KA_vs_PBS_Astro,
-    title = "CA3 Astrocytes: KA vs PBS",
-    subtitle = paste("Treatment effect in CA3 |",
-                     "FDR < 0.1:", sum(de_results$CA3_KA_vs_PBS_Astro$adj.P.Val < 0.1),
-                     "| p < 0.05:", sum(de_results$CA3_KA_vs_PBS_Astro$P.Value < 0.05)),
+    de_results$Trt_CA3_Ipsi_Astro,
+    title = "CA3 Astrocytes (Ipsi): KA vs PBS",
+    subtitle = paste0("FDR < ", FDR_THRESHOLD, ": ",
+                      sum(de_results$Trt_CA3_Ipsi_Astro$adj.P.Val < FDR_THRESHOLD),
+                      " | p < 0.05: ", sum(de_results$Trt_CA3_Ipsi_Astro$P.Value < 0.05)),
     n_label = 30
   )
-  save_figure(fig8c, "Fig8c_CA3_KA_vs_PBS_Astro", width = 10, height = 8)
+  save_figure(fig8c, "Fig8c_CA3_Ipsi_KA_vs_PBS_Astro", width = 10, height = 8)
 }
 
-# Combined 3-panel figure for CA3 KA vs PBS
-if(all(c("CA3_KA_vs_PBS_Neuron", "CA3_KA_vs_PBS_Micro", "CA3_KA_vs_PBS_Astro") %in% names(de_results))) {
+# Combined 3-panel figure for CA3 Ipsi KA vs PBS
+if(all(c("Trt_CA3_Ipsi_Neuron", "Trt_CA3_Ipsi_Micro", "Trt_CA3_Ipsi_Astro") %in% names(de_results))) {
   library(patchwork)
   
-  fig8_combined <- fig8a + fig8b + fig8c + 
+  fig8_combined <- fig8a + fig8b + fig8c +
     plot_layout(ncol = 3) +
     plot_annotation(
-      title = "CA3 Treatment Effect: KA vs PBS",
+      title = "CA3 Ipsilateral Treatment Effect: KA vs PBS",
       subtitle = "Primary experimental comparison - chronic KA (2 weeks post-injection)",
       theme = theme(
         plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
@@ -412,7 +420,7 @@ if(all(c("CA3_KA_vs_PBS_Neuron", "CA3_KA_vs_PBS_Micro", "CA3_KA_vs_PBS_Astro") %
       )
     )
   
-  save_figure(fig8_combined, "Fig8_CA3_KA_vs_PBS_combined", width = 18, height = 7)
+  save_figure(fig8_combined, "Fig8_CA3_Ipsi_KA_vs_PBS_combined", width = 18, height = 7)
 }
 
 # =============================================================================
@@ -420,38 +428,38 @@ if(all(c("CA3_KA_vs_PBS_Neuron", "CA3_KA_vs_PBS_Micro", "CA3_KA_vs_PBS_Astro") %
 # =============================================================================
 message("\n\n========== Figure 9: CA3 KA vs PBS Pathways ==========")
 
-# GSEA for CA3 KA vs PBS (if results exist)
-if("CA3_KA_vs_PBS_Neuron" %in% names(pathway_results$gsea_kegg)) {
-  gsea_ca3 <- pathway_results$gsea_kegg$CA3_KA_vs_PBS_Neuron
+# GSEA for CA3 Ipsi KA vs PBS
+if("Trt_CA3_Ipsi_Neuron" %in% names(pathway_results$gsea_kegg)) {
+  gsea_ca3 <- pathway_results$gsea_kegg$Trt_CA3_Ipsi_Neuron
   
   if(!is.null(gsea_ca3) && nrow(gsea_ca3) > 0) {
     fig9a <- dotplot(gsea_ca3, showCategory = 20,
-                     title = "KEGG Pathways: CA3 Neurons KA vs PBS") +
+                     title = "KEGG Pathways: CA3 Neurons (Ipsi) KA vs PBS") +
       theme_pub
-    save_figure(fig9a, "Fig9a_KEGG_CA3_Neuron_treatment", width = 10, height = 10)
+    save_figure(fig9a, "Fig9a_KEGG_CA3_Ipsi_Neuron_treatment", width = 10, height = 10)
   }
 }
 
-if("CA3_KA_vs_PBS_Micro" %in% names(pathway_results$gsea_kegg)) {
-  gsea_ca3_micro <- pathway_results$gsea_kegg$CA3_KA_vs_PBS_Micro
+if("Trt_CA3_Ipsi_Micro" %in% names(pathway_results$gsea_kegg)) {
+  gsea_ca3_micro <- pathway_results$gsea_kegg$Trt_CA3_Ipsi_Micro
   
   if(!is.null(gsea_ca3_micro) && nrow(gsea_ca3_micro) > 0) {
     fig9b <- dotplot(gsea_ca3_micro, showCategory = 20,
-                     title = "KEGG Pathways: CA3 Microglia KA vs PBS") +
+                     title = "KEGG Pathways: CA3 Microglia (Ipsi) KA vs PBS") +
       theme_pub
-    save_figure(fig9b, "Fig9b_KEGG_CA3_Micro_treatment", width = 10, height = 10)
+    save_figure(fig9b, "Fig9b_KEGG_CA3_Ipsi_Micro_treatment", width = 10, height = 10)
   }
 }
 
-# GO-BP for CA3 KA vs PBS
-if("CA3_KA_vs_PBS_Neuron" %in% names(pathway_results$go_bp)) {
-  go_ca3 <- pathway_results$go_bp$CA3_KA_vs_PBS_Neuron
+# GO-BP for CA3 Ipsi KA vs PBS
+if("Trt_CA3_Ipsi_Neuron" %in% names(pathway_results$go_bp)) {
+  go_ca3 <- pathway_results$go_bp$Trt_CA3_Ipsi_Neuron
   
   if(!is.null(go_ca3) && nrow(go_ca3) > 0) {
     fig9c <- dotplot(go_ca3, showCategory = 20,
-                     title = "GO Biological Process: CA3 Neurons KA vs PBS") +
+                     title = "GO Biological Process: CA3 Neurons (Ipsi) KA vs PBS") +
       theme_pub
-    save_figure(fig9c, "Fig9c_GO_BP_CA3_Neuron_treatment", width = 10, height = 10)
+    save_figure(fig9c, "Fig9c_GO_BP_CA3_Ipsi_Neuron_treatment", width = 10, height = 10)
   }
 }
 
@@ -460,13 +468,13 @@ if("CA3_KA_vs_PBS_Neuron" %in% names(pathway_results$go_bp)) {
 # =============================================================================
 message("\n\n========== Figure 10: CA3 KA vs PBS Heatmaps ==========")
 
-if("CA3_KA_vs_PBS_Neuron" %in% names(de_results)) {
-  # Get top genes by p-value (not FDR, since few pass FDR)
-  DE_ca3 <- de_results$CA3_KA_vs_PBS_Neuron
+if("Trt_CA3_Ipsi_Neuron" %in% names(de_results)) {
+  # Get top genes by p-value
+  DE_ca3 <- de_results$Trt_CA3_Ipsi_Neuron
   top_genes_ca3 <- head(rownames(DE_ca3[order(DE_ca3$P.Value), ]), 50)
   
-  # Subset to CA3 neurons only
-  ca3_neuron_idx <- pheno$Region == "CA3" & pheno$Aoi == "Neuron"
+  # Subset to CA3 Ipsi neurons (matching Trt_CA3_Ipsi_Neuron comparison)
+  ca3_neuron_idx <- pheno$Region == "CA3" & pheno$Aoi == "Neuron" & pheno$Side == "Ipsi"
   
   if(sum(ca3_neuron_idx) > 0 && length(top_genes_ca3) > 0) {
     mat_ca3 <- log2(assayDataElement(target_geoData, "q_norm")[top_genes_ca3, ca3_neuron_idx] + 1)
@@ -480,7 +488,7 @@ if("CA3_KA_vs_PBS_Neuron" %in% names(de_results)) {
       row.names = colnames(mat_ca3_z)
     )
     
-    pdf(file.path(FIGURES_DIR, "Fig10_heatmap_CA3_KA_vs_PBS_top50.pdf"), width = 10, height = 14)
+    pdf(file.path(FIGURES_DIR, "Fig10_heatmap_CA3_Ipsi_KA_vs_PBS_top50.pdf"), width = 10, height = 14)
     pheatmap(mat_ca3_z,
              annotation_col = annot_ca3,
              annotation_colors = list(
@@ -490,9 +498,9 @@ if("CA3_KA_vs_PBS_Neuron" %in% names(de_results)) {
              show_colnames = FALSE,
              clustering_method = "ward.D2",
              fontsize_row = 8,
-             main = "Top 50 DE Genes: CA3 Neurons KA vs PBS (by p-value)")
+             main = "Top 50 DE Genes: CA3 Neurons (Ipsi) KA vs PBS")
     dev.off()
-    message("Saved: Fig10_heatmap_CA3_KA_vs_PBS_top50")
+    message("Saved: Fig10_heatmap_CA3_Ipsi_KA_vs_PBS_top50")
   }
 }
 
@@ -505,6 +513,274 @@ for(name in names(de_results)) {
   fig <- plot_volcano_pub(de_results[[name]], title = name)
   save_figure(fig, paste0("SuppFig_volcano_", name), width = 10, height = 8)
 }
+
+# =============================================================================
+# FIGURE 11: Overlap Plots (Euler + UpSetR)
+# =============================================================================
+message("\n\n========== Figure 11: Overlap Plots ==========")
+
+library(eulerr)
+library(UpSetR)
+
+# --- 11a: eulerr 3-set Venn: KA vs PBS DE genes across cell types
+# Use Trt_Ipsi_* (pooled regions, Ipsi side - most power + most biologically relevant)
+make_sig_set <- function(comp_name, fdr = FDR_THRESHOLD, lfc = LFC_THRESHOLD) {
+  DE <- de_results[[comp_name]]
+  if(is.null(DE)) return(character(0))
+  rownames(DE)[DE$adj.P.Val < fdr & abs(DE$logFC) >= lfc]
+}
+
+genes_neuron <- make_sig_set("Trt_Ipsi_Neuron")
+genes_micro  <- make_sig_set("Trt_Ipsi_Micro")
+genes_astro  <- make_sig_set("Trt_Ipsi_Astro")
+
+if(length(genes_neuron) > 0 || length(genes_micro) > 0 || length(genes_astro) > 0) {
+  euler_sets <- list(
+    Neuron    = genes_neuron,
+    Microglia = genes_micro,
+    Astrocyte = genes_astro
+  )
+  
+  fit <- euler(euler_sets)
+  
+  pdf(file.path(FIGURES_DIR, "Fig11a_euler_KA_vs_PBS_celltypes.pdf"), width = 7, height = 7)
+  print(plot(fit,
+    fills = list(fill = unname(cell_colors), alpha = 0.5),
+    edges = TRUE,
+    labels = list(font = 2, cex = 1.2),
+    quantities = list(cex = 1.0),
+    main = paste0("KA vs PBS DE Genes by Cell Type (Ipsi)\n",
+                  "FDR < ", FDR_THRESHOLD, ", |logFC| > ", LFC_THRESHOLD)
+  ))
+  dev.off()
+  
+  # Also save PNG
+  png(file.path(FIGURES_DIR, "Fig11a_euler_KA_vs_PBS_celltypes.png"),
+      width = 700, height = 700, res = 100)
+  print(plot(fit,
+    fills = list(fill = unname(cell_colors), alpha = 0.5),
+    edges = TRUE,
+    labels = list(font = 2, cex = 1.2),
+    quantities = list(cex = 1.0),
+    main = paste0("KA vs PBS DE Genes by Cell Type (Ipsi)\n",
+                  "FDR < ", FDR_THRESHOLD, ", |logFC| > ", LFC_THRESHOLD)
+  ))
+  dev.off()
+  message("Saved: Fig11a_euler_KA_vs_PBS_celltypes")
+  
+  # Print overlap summary
+  cat("\nKA vs PBS overlap (Ipsi, FDR<", FDR_THRESHOLD, " |logFC|>", LFC_THRESHOLD, "):\n")
+  cat(" Neuron: ", length(genes_neuron), "\n")
+  cat(" Microglia:", length(genes_micro), "\n")
+  cat(" Astrocyte:", length(genes_astro), "\n")
+  cat(" All 3 shared:", length(Reduce(intersect, euler_sets)), "\n")
+  cat(" Neuron+Micro:", length(intersect(genes_neuron, genes_micro)), "\n")
+  cat(" Neuron+Astro:", length(intersect(genes_neuron, genes_astro)), "\n")
+  cat(" Micro+Astro: ", length(intersect(genes_micro, genes_astro)), "\n")
+} else {
+  message("No FDR-significant genes in Trt_Ipsi_* comparisons — generating Fig11a with nominal p < 0.05")
+  
+  make_nom_set <- function(comp_name, pcut = 0.05, lfc = LFC_THRESHOLD) {
+    DE <- de_results[[comp_name]]
+    if(is.null(DE)) return(character(0))
+    rownames(DE)[DE$P.Value < pcut & abs(DE$logFC) >= lfc]
+  }
+  
+  genes_neuron_nom <- make_nom_set("Trt_Ipsi_Neuron")
+  genes_micro_nom  <- make_nom_set("Trt_Ipsi_Micro")
+  genes_astro_nom  <- make_nom_set("Trt_Ipsi_Astro")
+  
+  cat(" Neuron (p<0.05):", length(genes_neuron_nom), "\n")
+  cat(" Micro  (p<0.05):", length(genes_micro_nom),  "\n")
+  cat(" Astro  (p<0.05):", length(genes_astro_nom),  "\n")
+  
+  if(length(genes_neuron_nom) > 0 || length(genes_micro_nom) > 0 || length(genes_astro_nom) > 0) {
+    euler_sets_nom <- list(
+      Neuron    = genes_neuron_nom,
+      Microglia = genes_micro_nom,
+      Astrocyte = genes_astro_nom
+    )
+    fit_nom <- euler(euler_sets_nom)
+    
+    pdf(file.path(FIGURES_DIR, "Fig11a_euler_KA_vs_PBS_celltypes_nominal.pdf"), width = 7, height = 7)
+    print(plot(fit_nom,
+      fills = list(fill = unname(cell_colors), alpha = 0.5),
+      edges = TRUE,
+      labels = list(font = 2, cex = 1.2),
+      quantities = list(cex = 1.0),
+      main = paste0("KA vs PBS Nominal DE Genes by Cell Type (Ipsi)\n",
+                    "p < 0.05 (uncorrected), |logFC| > ", LFC_THRESHOLD,
+                    "\n(No FDR-significant genes in direct KA vs PBS comparison)")
+    ))
+    dev.off()
+    
+    png(file.path(FIGURES_DIR, "Fig11a_euler_KA_vs_PBS_celltypes_nominal.png"),
+        width = 700, height = 700, res = 100)
+    print(plot(fit_nom,
+      fills = list(fill = unname(cell_colors), alpha = 0.5),
+      edges = TRUE,
+      labels = list(font = 2, cex = 1.2),
+      quantities = list(cex = 1.0),
+      main = paste0("KA vs PBS Nominal DE Genes by Cell Type (Ipsi)\n",
+                    "p < 0.05 (uncorrected), |logFC| > ", LFC_THRESHOLD,
+                    "\n(No FDR-significant genes in direct KA vs PBS comparison)")
+    ))
+    dev.off()
+    message("Saved: Fig11a_euler_KA_vs_PBS_celltypes_nominal (nominal p-value)")
+  } else {
+    message("Skipping Fig11a: no nominally significant genes at |logFC| >= ", LFC_THRESHOLD, " in KA vs PBS Ipsi comparisons")
+  }
+}
+
+# --- 11b: UpSetR - Regional DE genes across cell types and treatment groups
+# (Trt_ comparisons have no FDR-significant genes; using Reg_ comparisons
+#  which show the dominant regional signal: CA3 vs CA1)
+reg_comps_for_upset <- c("Reg_KA_Neuron", "Reg_KA_Micro", "Reg_KA_Astro",
+                          "Reg_PBS_Neuron", "Reg_PBS_Micro", "Reg_PBS_Astro")
+reg_comps_for_upset <- reg_comps_for_upset[reg_comps_for_upset %in% names(de_results)]
+
+all_reg_sig_genes <- unique(unlist(lapply(reg_comps_for_upset, function(comp) {
+  DE <- de_results[[comp]]
+  rownames(DE)[DE$adj.P.Val < FDR_THRESHOLD & abs(DE$logFC) >= LFC_THRESHOLD]
+})))
+
+if(length(all_reg_sig_genes) >= 5) {
+  upset_mat <- as.data.frame(lapply(setNames(reg_comps_for_upset, reg_comps_for_upset), function(comp) {
+    DE <- de_results[[comp]]
+    as.integer(all_reg_sig_genes %in% rownames(DE)[DE$adj.P.Val < FDR_THRESHOLD & abs(DE$logFC) >= LFC_THRESHOLD])
+  }))
+  rownames(upset_mat) <- all_reg_sig_genes
+  
+  # Color sets by cell type
+  set_colors_reg <- ifelse(grepl("Neuron", reg_comps_for_upset), cell_colors["Neuron"],
+                    ifelse(grepl("Micro",  reg_comps_for_upset), cell_colors["Microglia"],
+                                                                  cell_colors["Astrocyte"]))
+  names(set_colors_reg) <- reg_comps_for_upset
+  
+  # Shorter display labels
+  comp_labels <- gsub("Reg_KA_", "KA:", gsub("Reg_PBS_", "PBS:", reg_comps_for_upset))
+  colnames(upset_mat) <- comp_labels
+  
+  pdf(file.path(FIGURES_DIR, "Fig11b_UpSetR_Regional_all_celltype.pdf"), width = 14, height = 8)
+  upset(
+    upset_mat,
+    sets             = comp_labels,
+    sets.bar.color   = unname(set_colors_reg),
+    order.by         = "freq",
+    decreasing       = TRUE,
+    mb.ratio         = c(0.6, 0.4),
+    text.scale       = c(1.3, 1.1, 1.1, 1.0, 1.2, 1.0),
+    mainbar.y.label  = paste0("FDR-significant DE Genes in Intersection\n(FDR < ",
+                               FDR_THRESHOLD, ", |logFC| > ", LFC_THRESHOLD, ")"),
+    sets.x.label     = "DE Genes per Comparison",
+    main.bar.color   = "#2C3E50",
+    matrix.color     = "#2C3E50",
+    point.size       = 3.0,
+    line.size        = 0.9
+  )
+  dev.off()
+  message("Saved: Fig11b_UpSetR_Regional_all_celltype (", length(all_reg_sig_genes), " genes)")
+} else {
+  message("Skipping Fig11b UpSetR: insufficient FDR-significant genes in regional comparisons")
+}
+
+# --- 11c: eulerr - Regional DE genes across cell types (CA3 vs CA1 in KA, pooled sides)
+genes_reg_neuron <- make_sig_set("Reg_KA_Neuron")
+genes_reg_micro  <- make_sig_set("Reg_KA_Micro")
+genes_reg_astro  <- make_sig_set("Reg_KA_Astro")
+
+if(length(genes_reg_neuron) > 0 || length(genes_reg_micro) > 0 || length(genes_reg_astro) > 0) {
+  euler_reg <- list(
+    Neuron    = genes_reg_neuron,
+    Microglia = genes_reg_micro,
+    Astrocyte = genes_reg_astro
+  )
+  
+  fit_reg <- euler(euler_reg)
+  
+  pdf(file.path(FIGURES_DIR, "Fig11c_euler_Regional_KA_celltypes.pdf"), width = 7, height = 7)
+  print(plot(fit_reg,
+    fills = list(fill = unname(cell_colors), alpha = 0.5),
+    edges = TRUE,
+    labels = list(font = 2, cex = 1.2),
+    quantities = list(cex = 1.0),
+    main = paste0("CA3 vs CA1 DE Genes by Cell Type (KA)\n",
+                  "FDR < ", FDR_THRESHOLD, ", |logFC| > ", LFC_THRESHOLD)
+  ))
+  dev.off()
+  
+  png(file.path(FIGURES_DIR, "Fig11c_euler_Regional_KA_celltypes.png"),
+      width = 700, height = 700, res = 100)
+  print(plot(fit_reg,
+    fills = list(fill = unname(cell_colors), alpha = 0.5),
+    edges = TRUE,
+    labels = list(font = 2, cex = 1.2),
+    quantities = list(cex = 1.0),
+    main = paste0("CA3 vs CA1 DE Genes by Cell Type (KA)\n",
+                  "FDR < ", FDR_THRESHOLD, ", |logFC| > ", LFC_THRESHOLD)
+  ))
+  dev.off()
+  message("Saved: Fig11c_euler_Regional_KA_celltypes")
+}
+
+# =============================================================================
+# FIGURE 12: Reactome + GO-MF Pathway Plots
+# =============================================================================
+message("\n\n========== Figure 12: Reactome + GO-MF Pathway Plots ==========")
+
+library(ReactomePA)
+library(enrichplot)
+
+plot_pathway <- function(result, title, filename, width = 10, height = 10) {
+  if(!is.null(result) && nrow(result) > 0) {
+    p <- dotplot(result, showCategory = 20, title = title) + theme_pub
+    save_figure(p, filename, width = width, height = height)
+  }
+}
+
+# Reactome GSEA - regional neuronal comparison (most significant)
+plot_pathway(
+  pathway_results$reactome_gsea$Reg_KA_Neuron,
+  title    = "Reactome Pathways: Neurons CA3 vs CA1 (KA)",
+  filename = "Fig12a_Reactome_Reg_KA_Neuron"
+)
+
+plot_pathway(
+  pathway_results$reactome_gsea$Reg_KA_Micro,
+  title    = "Reactome Pathways: Microglia CA3 vs CA1 (KA)",
+  filename = "Fig12b_Reactome_Reg_KA_Micro"
+)
+
+plot_pathway(
+  pathway_results$reactome_gsea$Reg_KA_Astro,
+  title    = "Reactome Pathways: Astrocytes CA3 vs CA1 (KA)",
+  filename = "Fig12c_Reactome_Reg_KA_Astro"
+)
+
+plot_pathway(
+  pathway_results$reactome_gsea$Trt_CA3_Ipsi_Neuron,
+  title    = "Reactome Pathways: CA3 Neurons (Ipsi) KA vs PBS",
+  filename = "Fig12d_Reactome_CA3_Ipsi_Neuron_treatment"
+)
+
+# GO Molecular Function
+plot_pathway(
+  pathway_results$go_mf$Reg_KA_Neuron,
+  title    = "GO Molecular Function: Neurons CA3 vs CA1 (KA)",
+  filename = "Fig12e_GO_MF_Reg_KA_Neuron"
+)
+
+plot_pathway(
+  pathway_results$go_mf$Reg_KA_Micro,
+  title    = "GO Molecular Function: Microglia CA3 vs CA1 (KA)",
+  filename = "Fig12f_GO_MF_Reg_KA_Micro"
+)
+
+plot_pathway(
+  pathway_results$go_mf$Trt_CA3_Ipsi_Neuron,
+  title    = "GO Molecular Function: CA3 Neurons (Ipsi) KA vs PBS",
+  filename = "Fig12g_GO_MF_CA3_Ipsi_Neuron_treatment"
+)
 
 # =============================================================================
 # DONE

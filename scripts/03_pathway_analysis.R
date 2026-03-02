@@ -15,6 +15,7 @@ library(clusterProfiler)
 library(org.Mm.eg.db)
 library(enrichplot)
 library(DOSE)
+library(ReactomePA)
 
 # Load DE results
 de_results <- readRDS(file.path(RESULTS_DIR, "de_results_all.rds"))
@@ -164,29 +165,95 @@ run_kegg_ora <- function(DE, label, pcut = 0.05) {
   return(kegg_result)
 }
 
+#' Run Reactome GSEA
+run_reactome_gsea <- function(DE, label) {
+  cat("\n=== Reactome GSEA:", label, "===\n")
+  
+  gene_list <- prepare_gsea_list(DE)
+  cat("Genes with Entrez IDs:", length(gene_list), "\n")
+  
+  gsea_result <- tryCatch({
+    ReactomePA::gsePathway(
+      geneList     = gene_list,
+      organism     = "mouse",
+      minGSSize    = 10,
+      maxGSSize    = 500,
+      pvalueCutoff = 0.1,
+      verbose      = FALSE
+    )
+  }, error = function(e) {
+    cat("  Error:", e$message, "\n")
+    return(NULL)
+  })
+  
+  if(!is.null(gsea_result) && nrow(gsea_result) > 0) {
+    cat("Significant pathways (FDR < 0.1):", nrow(gsea_result), "\n")
+  } else {
+    cat("No significant pathways found\n")
+  }
+  
+  return(gsea_result)
+}
+
+#' Run GO enrichment (Molecular Function)
+run_go_mf <- function(DE, label, pcut = 0.05) {
+  cat("\n=== GO-MF:", label, "===\n")
+  
+  sig_genes <- rownames(DE)[DE$P.Value < pcut]
+  cat("Input genes:", length(sig_genes), "\n")
+  
+  if(length(sig_genes) < 10) {
+    cat("Too few genes for enrichment\n")
+    return(NULL)
+  }
+  
+  mapping  <- get_entrez_ids(sig_genes)
+  entrez_ids <- mapping$ENTREZID
+  
+  go_result <- tryCatch({
+    enrichGO(
+      gene          = entrez_ids,
+      OrgDb         = org.Mm.eg.db,
+      ont           = "MF",
+      pAdjustMethod = "BH",
+      pvalueCutoff  = 0.1,
+      qvalueCutoff  = 0.2,
+      readable      = TRUE
+    )
+  }, error = function(e) {
+    cat("  Error:", e$message, "\n")
+    return(NULL)
+  })
+  
+  if(!is.null(go_result) && nrow(go_result) > 0) {
+    cat("Significant GO-MF terms:", nrow(go_result), "\n")
+  }
+  
+  return(go_result)
+}
+
 # =============================================================================
 # RUN PATHWAY ANALYSIS ON KEY COMPARISONS
 # =============================================================================
 
-# PRIMARY COMPARISONS: CA3 KA vs PBS (main experimental question!)
+# Key comparisons from de_results_all.rds (Feb 20 HPC run - 60 comparisons)
+
+# PRIMARY: CA3 KA vs PBS (main experimental question, both sides for robustness)
 primary_comparisons <- c(
-  "CA3_KA_vs_PBS_Neuron",
-  "CA3_KA_vs_PBS_Micro", 
-  "CA3_KA_vs_PBS_Astro"
+  "Trt_CA3_Ipsi_Neuron",   "Trt_CA3_Ipsi_Micro",   "Trt_CA3_Ipsi_Astro",
+  "Trt_CA3_Contra_Neuron", "Trt_CA3_Contra_Micro", "Trt_CA3_Contra_Astro"
 )
 
-# SECONDARY: Regional vulnerability (strongest statistical results)
+# REGIONAL: CA3 vs CA1 vulnerability (pooled sides for power)
 regional_comparisons <- c(
-  "KA_Regional_Neuron",   # ~2700 FDR genes
-  "KA_Regional_Micro",    # ~800 FDR genes
-  "KA_Regional_Astro"     # ~200 FDR genes
+  "Reg_KA_Neuron",  "Reg_KA_Micro",  "Reg_KA_Astro",
+  "Reg_PBS_Neuron", "Reg_PBS_Micro", "Reg_PBS_Astro"
 )
 
-# TERTIARY: Interaction effects
+# INTERACTION: Region x Treatment (genes with injury-dependent regional difference)
 interaction_comparisons <- c(
-  "Interaction_Neuron",
-  "Interaction_Micro",
-  "Interaction_Astro"
+  "Int_Ipsi_Neuron",   "Int_Ipsi_Micro",   "Int_Ipsi_Astro",
+  "Int_Contra_Neuron", "Int_Contra_Micro", "Int_Contra_Astro"
 )
 
 # All comparisons to analyze
@@ -232,6 +299,32 @@ for(comp in key_comparisons) {
 }
 
 # =============================================================================
+# REACTOME GSEA
+# =============================================================================
+message("\n\n========== Reactome GSEA Analysis ==========")
+
+reactome_gsea_results <- list()
+
+for(comp in key_comparisons) {
+  if(comp %in% names(de_results)) {
+    reactome_gsea_results[[comp]] <- run_reactome_gsea(de_results[[comp]], comp)
+  }
+}
+
+# =============================================================================
+# GO Molecular Function
+# =============================================================================
+message("\n\n========== GO Molecular Function ==========")
+
+go_mf_results <- list()
+
+for(comp in key_comparisons) {
+  if(comp %in% names(de_results)) {
+    go_mf_results[[comp]] <- run_go_mf(de_results[[comp]], comp)
+  }
+}
+
+# =============================================================================
 # PRINT TOP RESULTS
 # =============================================================================
 message("\n\n========== TOP PATHWAY RESULTS ==========")
@@ -257,9 +350,11 @@ for(comp in names(go_bp_results)) {
 # =============================================================================
 
 pathway_results <- list(
-  gsea_kegg = gsea_kegg_results,
-  go_bp = go_bp_results,
-  kegg_ora = kegg_ora_results
+  gsea_kegg     = gsea_kegg_results,
+  go_bp         = go_bp_results,
+  kegg_ora      = kegg_ora_results,
+  reactome_gsea = reactome_gsea_results,
+  go_mf         = go_mf_results
 )
 
 saveRDS(pathway_results, file.path(RESULTS_DIR, "pathway_results.rds"))
@@ -283,5 +378,23 @@ for(comp in names(go_bp_results)) {
   }
 }
 
+for(comp in names(reactome_gsea_results)) {
+  result <- reactome_gsea_results[[comp]]
+  if(!is.null(result) && nrow(result) > 0) {
+    write.csv(result@result,
+              file.path(RESULTS_DIR, paste0("Reactome_GSEA_", comp, ".csv")),
+              row.names = FALSE)
+  }
+}
+
+for(comp in names(go_mf_results)) {
+  result <- go_mf_results[[comp]]
+  if(!is.null(result) && nrow(result) > 0) {
+    write.csv(result@result,
+              file.path(RESULTS_DIR, paste0("GO_MF_", comp, ".csv")),
+              row.names = FALSE)
+  }
+}
+
 message("\n\nPathway results saved to: ", RESULTS_DIR)
-message("Run 03_figures.R next!")
+message("Run 04_figures.R next!")
