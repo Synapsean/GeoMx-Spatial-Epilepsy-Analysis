@@ -62,7 +62,7 @@ Checkpoints let the pipeline resume from the last completed section if interrupt
 
 ### Key Findings
 
-The dominant transcriptional signal is **regional (CA3 vs CA1)**, not treatment (KA vs PBS). All three cell types show hundreds of FDR-significant regional differences; direct KA vs PBS comparisons return zero FDR hits after correcting for the mouse random effect and the strong regional structure. This is a biological finding, not a statistical failure — see [INTERPRETATION.md](INTERPRETATION.md) for full breakdown.
+The dominant transcriptional signal is **regional (CA3 vs CA1)**, not treatment (KA vs PBS). All three cell types show hundreds of FDR-significant regional differences; direct KA vs PBS comparisons return zero FDR hits after correcting for the mouse random effect and the strong regional structure.
 
 Top regional hits in KA neurons include *Cpne4*, *Spock1*, *Nnat*, *Grik4* (GluK4 kainate receptor, directly relevant to the model), and *Ly6e*. Pathway enrichment points to synaptic vesicle cycle, oxidative phosphorylation, and neurodegeneration pathways enriched in CA3.
 
