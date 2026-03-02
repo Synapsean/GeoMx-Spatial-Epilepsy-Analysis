@@ -1,6 +1,6 @@
 # All Possible Comparisons - GeoMx Chronic KA Analysis
 
-## Your Experimental Design
+##  Experimental Design
 - **Mice**: 10 (5 KA, 5 PBS)
 - **Cell Types**: 3 (Astrocyte, Microglia, Neuron)
 - **Regions**: 2 (CA1, CA3)
@@ -204,34 +204,3 @@
 
 ---
 
-## QUESTIONS FOR YOU:
-
-1. **What's your primary research question?**
-   - Are you most interested in treatment effects, regional vulnerability, or ipsi/contra differences?
-   Answer: Mostly in treatment effects. However there seems to be more regional differences. Ipsi v contra differences could also be explained better (see answer to Q2)
-
-2. **What's the biological context?**
-   - Is this a unilateral injection model (KA injected on one side)?
-   Answer: Yes, so the ipsi side is more damaged, and the CA3 in particular. It could be postulated that the contra side is "protected" so therefor we could explain some the differences there by comparing side i.e. do cells on the contra side engage in some repair or protective mechanisms
-   - Is CA3 expected to be more vulnerable than CA1?
-   Answer: Yes, see above
-
-3. **Current implementation runs 18 comparisons:**
-   - CA3 KA vs PBS (3 cell types) - #13-15
-   - Pooled KA vs PBS with Region+Side covariates (3 cell types) - #25-27
-   - Ipsi KA vs PBS with Region covariate (3 cell types) - #19-21
-   - KA Regional CA3 vs CA1 (3 cell types) - #40-42
-   - PBS Regional CA3 vs CA1 (3 cell types) - #43-45
-   - Region × Treatment interactions (3 cell types) - #85-87
-
-4. **Which comparisons are ESSENTIAL for your story?**
-   - What will you show in figures? 
-   - What supports your main conclusions?
-
-5. **Do you care about Ipsi vs Contra differences?**
-   - If yes, we should add those comparisons
-   - If no, we can ignore all Side comparisons and just adjust for Side as covariate
-
-6. **Statistical power concerns?**
-   - More specific comparisons = fewer samples = less power
-   - Would you rather have fewer high-powered tests or more exploratory tests?
