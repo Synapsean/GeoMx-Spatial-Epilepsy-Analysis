@@ -207,11 +207,8 @@ Reads from: `results/de_results_all.rds`
 The analysis takes ~15 mins/comparison serially on a laptop = ~15 hours total. Used UCD Sonic HPC instead.
 
 ### HPC Details
-- **Hostname**: sonic.ucd.ie
-- **Username**: sequinlan
 - **Scheduler**: SLURM
 - **R version**: R/4.4.2 (loaded via `module load R/4.4.2`)
-- **Home directory**: `/home/people/sequinlan/`
 - **Partitions available**: `shared` (default, 54 nodes), `long`, `gpu`, `dev`
 
 ### 5.1 Transfer Files to HPC
@@ -275,7 +272,7 @@ Rscript scripts/02_differential_expression.R
 ```
 
 **Key SLURM notes for Sonic**:
-- Partition: `shared` (not `compute` — that doesn't exist on Sonic)
+- Partition: `shared`
 - **Do not set `--mem`** — Sonic nodes report `MEMORY=1` in sinfo, meaning memory tracking is disabled. Any `--mem` request will fail with "Memory specification cannot be satisfied / Requested node configuration is not available"
 - CPUs: nodes have 32+ CPUs; requesting 16 is reasonable and leaves headroom
 - `R_LIBS_USER` export is essential — without it the job uses the system library and can't find installed packages
