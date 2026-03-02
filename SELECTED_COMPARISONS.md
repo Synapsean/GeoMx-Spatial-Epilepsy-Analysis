@@ -1,7 +1,5 @@
 # Selected Comparisons Summary
 
-Based on your selections, you want to run **60 comparisons** organized as follows:
-
 ---
 
 ## 1. TREATMENT EFFECTS (KA vs PBS) - 18 comparisons
@@ -68,22 +66,6 @@ Based on your selections, you want to run **60 comparisons** organized as follow
 
 ---
 
-## BIOLOGICAL INTERPRETATION
-
-Based on your answers, this design addresses:
-
-1. **Primary Question**: Does KA treatment affect different cell types across regions and sides?
-2. **Regional Vulnerability**: Is CA3 more vulnerable than CA1, and does this differ by treatment/side?
-3. **Contralateral Protection**: Do cells on the less-damaged contralateral side show protective/compensatory signatures?
-
-### Key Comparisons for Your Story:
-- **#1-12**: Detect treatment effects in specific anatomical compartments (most sensitive)
-- **#28-39**: Show CA3 is more vulnerable than CA1 in KA (especially Ipsi side)
-- **#55-66**: Reveal contralateral "protective" mechanisms by comparing Ipsi vs Contra
-- **#79-84**: Test if CA3/CA1 difference is GREATER in KA than PBS (injury-induced vulnerability)
-
----
-
 ## IMPLEMENTATION NOTES
 
 **Dream() formulas for each comparison type:**
@@ -118,12 +100,7 @@ Based on your answers, this design addresses:
 - **Sample sizes per comparison**:
   - Highly specific: ~10-15 ROIs from 5 mice per group
   - Pooled: ~20-30 ROIs from 5 mice per group
-- **Runtime**: Approximately 2-3 hours for all 60 comparisons
 
-**Recommendation**: Given the exploratory nature and biological interpretability, this is a reasonable set. You can always focus on the most interesting signatures for validation.
 
 ---
 
-## NEXT STEPS
-
-Ready to implement these 60 comparisons in the R script?
